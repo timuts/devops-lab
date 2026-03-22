@@ -42,3 +42,7 @@ Included should be:
         *   CNI
             *   Flannel
             *   Cilium
+
+---
+
+Web version: https://x255.net/devops-lab/
