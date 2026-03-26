@@ -104,7 +104,11 @@ Docs:
 
 ### HTTP
 
-I used lighttpd on `seesaw` to serve the files `boot.ipxe`, `linux`, `initrd.gz`, and `preseed.cfg`.
+I used lighttpd on `seesaw` to serve the files `boot.ipxe`, `linux`,
+`initrd.gz`, and `preseed.cfg` from `/var/www/html/boot/debian/trixie-ipxe`.
+
+I downloaded `linux` and `initrd.gz` from:
+http://deb.debian.org/debian/dists/trixie/main/installer-amd64/current/images/netboot/debian-installer/amd64/
 
 ```bash
 sudo apt install lighttpd
