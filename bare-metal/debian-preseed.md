@@ -115,107 +115,6 @@ sudo apt install lighttpd
 ```
 
 
-### Missing Firmware
-
-On one of the machines the installer was missing firmware for the NIC. There
-aren't many options for making extra firmware files available before there is a
-network connection. I chose to modify the initrd.
-
-First, while in the installer, I pressed `Alt+F2` to get to a shell, then ran
-`dmesg | less`, searched for `"failed to load"` and wrote down the filename
-(including the directory name if present). `less /var/log/syslog` also mentions
-the missing firmware file.
-
-I used `apt-file` to search for the package that contains the file.
-
-Make sure the `non-free-firmware` component is enabled in
-`/etc/apt/sources.list`.
-
-```bash
-$ sudo apt install apt-file
-$ sudo apt-file update
-$ apt-file find rtl_nic/rtl8168d-1.fw
-firmware-realtek: /usr/lib/firmware/rtl_nic/rtl8168d-1.fw
-```
-
-Download the package. No need to install it.
-
-```bash
-sudo apt install --download-only firmware-realtek
-
-ls -l /var/cache/apt/archives/firmware-realtek*
-```
-
-If you don't yet have a machine running the target release from which to run
-`apt-file`, you can hunt for the firmware file in:
-https://cdimage.debian.org/cdimage/firmware/trixie/current/
-
-```bash
-$ mkdir /tmp/firmware
-$ cd /tmp/firmware
-$ wget https://cdimage.debian.org/cdimage/firmware/trixie/current/firmware.tar.gz
-$ tar zxf firmware.tar.gz
-$ grep rtl_nic/rtl8168d-1.fw Contents-firmware
-/usr/lib/firmware/rtl_nic/rtl8168d-1.fw                 firmware-realtek_20250410-2_all.deb non-free-firmware
-```
-
-Extract the contents of the `*.deb` file. Substitute the path
-`/tmp/firmware/firmware-realtek_20250410-2_all.deb` if you got it from
-`firmware.tar.gz`.
-
-```bash
-$ mkdir /tmp/firmware-realtek_20250410-2_all
-$ cd /tmp/firmware-realtek_20250410-2_all
-$ dpkg-deb -X /var/cache/apt/archives/firmware-realtek_20250410-2_all.deb .
-$ find | grep rtl_nic/rtl8168d-1.fw
-./usr/lib/firmware/rtl_nic/rtl8168d-1.fw
-```
-
-Unpack the initrd cpio file, add the firmware file(s) at the exact same path as
-in the `*.deb` file, and create a new `initrd.gz`. `fakeroot` is used to
-preserve root ownership and special files in `/dev`.
-
-```bash
-cp -a initrd.gz initrd.gz.bak1
-
-fakeroot
-mkdir initrd
-cd initrd
-zcat ../initrd.gz | cpio -i
-
-mkdir ./usr/lib/firmware/rtl_nic
-cp -a /tmp/firmware-realtek_20250410-2_all/usr/lib/firmware/rtl_nic/rtl8168d-1.fw ./usr/lib/firmware/rtl_nic/
-
-find | cpio -H newc -o | gzip -9 > ../initrd.gz
-
-# quit fakeroot
-exit
-```
-
-To verify that the file was inserted successfully without any other change,
-diff the listings of the contents:
-
-```bash
-$ zcat initrd.gz.bak1 | cpio -t | sort > initrd.list.old
-$ zcat initrd.gz | cpio -t | sort > initrd.list.new
-$ diff -u initrd.list.{old,new}
-```
-
-```diff
---- initrd.list.old     2026-03-26 13:44:49.197226274 -0700
-+++ initrd.list.new     2026-03-26 13:49:05.964179667 -0700
-@@ -1075,6 +1075,8 @@
- usr/lib/firmware
- usr/lib/firmware/regulatory.db
- usr/lib/firmware/regulatory.db.p7s
-+usr/lib/firmware/rtl_nic
-+usr/lib/firmware/rtl_nic/rtl8168d-1.fw
- usr/lib/libasound.so.2
- usr/lib/libasound.so.2.0.0
- usr/lib/libcrypto.so.3
-```
-
-
 ### Caching Proxy
 
 I'm using a Squid proxy as a cache running on `seesaw` to speed up subsequent
@@ -379,3 +278,106 @@ Docs:
 
 -   https://www.debian.org/releases/trixie/example-preseed.txt
 -   https://www.debian.org/releases/trixie/amd64/apb.en.html
+
+
+## Problems
+
+### Missing Firmware
+
+On one of the machines the installer was missing firmware for the NIC. There
+aren't many options for making extra firmware files available before there is a
+network connection. I chose to modify the initrd.
+
+First, while in the installer, I pressed `Alt+F2` to get to a shell, then ran
+`dmesg | less`, searched for `"failed to load"` and wrote down the filename
+(including the directory name if present). `less /var/log/syslog` also mentions
+the missing firmware file.
+
+I used `apt-file` to search for the package that contains the file.
+
+Make sure the `non-free-firmware` component is enabled in
+`/etc/apt/sources.list`.
+
+```bash
+$ sudo apt install apt-file
+$ sudo apt-file update
+$ apt-file find rtl_nic/rtl8168d-1.fw
+firmware-realtek: /usr/lib/firmware/rtl_nic/rtl8168d-1.fw
+```
+
+Download the package. No need to install it.
+
+```bash
+sudo apt install --download-only firmware-realtek
+
+ls -l /var/cache/apt/archives/firmware-realtek*
+```
+
+If you don't yet have a machine running the target release from which to run
+`apt-file`, you can hunt for the firmware file in:
+https://cdimage.debian.org/cdimage/firmware/trixie/current/
+
+```bash
+$ mkdir /tmp/firmware
+$ cd /tmp/firmware
+$ wget https://cdimage.debian.org/cdimage/firmware/trixie/current/firmware.tar.gz
+$ tar zxf firmware.tar.gz
+$ grep rtl_nic/rtl8168d-1.fw Contents-firmware
+/usr/lib/firmware/rtl_nic/rtl8168d-1.fw                 firmware-realtek_20250410-2_all.deb non-free-firmware
+```
+
+Extract the contents of the `*.deb` file. Substitute the path
+`/tmp/firmware/firmware-realtek_20250410-2_all.deb` if you got it from
+`firmware.tar.gz`.
+
+```bash
+$ mkdir /tmp/firmware-realtek_20250410-2_all
+$ cd /tmp/firmware-realtek_20250410-2_all
+$ dpkg-deb -X /var/cache/apt/archives/firmware-realtek_20250410-2_all.deb .
+$ find | grep rtl_nic/rtl8168d-1.fw
+./usr/lib/firmware/rtl_nic/rtl8168d-1.fw
+```
+
+Unpack the initrd cpio file, add the firmware file(s) at the exact same path as
+in the `*.deb` file, and create a new `initrd.gz`. `fakeroot` is used to
+preserve root ownership and special files in `/dev`.
+
+```bash
+cp -a initrd.gz initrd.gz.bak1
+
+fakeroot
+mkdir initrd
+cd initrd
+zcat ../initrd.gz | cpio -i
+
+mkdir ./usr/lib/firmware/rtl_nic
+cp -a /tmp/firmware-realtek_20250410-2_all/usr/lib/firmware/rtl_nic/rtl8168d-1.fw ./usr/lib/firmware/rtl_nic/
+
+find | cpio -H newc -o | gzip -9 > ../initrd.gz
+
+# quit fakeroot
+exit
+```
+
+To verify that the file was inserted successfully without any other change,
+diff the listings of the contents:
+
+```bash
+$ zcat initrd.gz.bak1 | cpio -t | sort > initrd.list.old
+$ zcat initrd.gz | cpio -t | sort > initrd.list.new
+$ diff -u initrd.list.{old,new}
+```
+
+```diff
+--- initrd.list.old     2026-03-26 13:44:49.197226274 -0700
++++ initrd.list.new     2026-03-26 13:49:05.964179667 -0700
+@@ -1075,6 +1075,8 @@
+ usr/lib/firmware
+ usr/lib/firmware/regulatory.db
+ usr/lib/firmware/regulatory.db.p7s
++usr/lib/firmware/rtl_nic
++usr/lib/firmware/rtl_nic/rtl8168d-1.fw
+ usr/lib/libasound.so.2
+ usr/lib/libasound.so.2.0.0
+ usr/lib/libcrypto.so.3
+```
