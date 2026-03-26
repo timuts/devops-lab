@@ -258,6 +258,7 @@ d-i pkgsel/include string openssh-server acpi arping bc bind9-dnsutils bind9-hos
 d-i pkgsel/upgrade select safe-upgrade
 
 d-i grub-installer/only_debian boolean true
+d-i grub-installer/bootdev string default
 
 d-i finish-install/keep-consoles boolean true
 d-i finish-install/reboot_in_progress note
