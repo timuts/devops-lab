@@ -2,8 +2,9 @@
 
 ## Objective
 
-A fully automated, hands-off Debian install process. To the point where Puppet
-can take over to finish and maintain the configuration.
+A fully automated, hands-off Debian install process. To the point where a
+configuration management system can take over to finish the process and
+maintain it.
 
 ## How it works
 
@@ -30,7 +31,7 @@ I used `dnsmasq` for this. It can serve DHCP, DNS, and TFTP out of one binary.
 sudo apt install dnsmasq
 ```
 
-My `/etc/dnsmasq.conf` on `seesaw`:
+My `/etc/dnsmasq.conf` file:
 
 ```ini
 # Ignore DNS servers in /etc/resolv.conf
@@ -104,8 +105,8 @@ Docs:
 
 ### HTTP
 
-I used lighttpd on `seesaw` to serve the files `boot.ipxe`, `linux`,
-`initrd.gz`, and `preseed.cfg` from `/var/www/html/boot/debian/trixie-ipxe`.
+I used lighttpd to serve the files `boot.ipxe`, `linux`, `initrd.gz`, and
+`preseed.cfg` from `/var/www/html/boot/debian/trixie-ipxe`.
 
 I downloaded `linux` and `initrd.gz` from:
 http://deb.debian.org/debian/dists/trixie/main/installer-amd64/current/images/netboot/debian-installer/amd64/
@@ -117,14 +118,13 @@ sudo apt install lighttpd
 
 ### Caching Proxy
 
-I'm using a Squid proxy as a cache running on `seesaw` to speed up subsequent
-installs.
+I'm using a Squid proxy as a cache to speed up subsequent installs.
 
 ```bash
 sudo apt install squid
 ```
 
-My `/etc/squid/squid.conf` on `seesaw`:
+My `/etc/squid/squid.conf` file:
 
 ```
 http_port 3128
@@ -175,7 +175,7 @@ Docs:
 
 ## Preseed
 
-My preseed file:
+My `preseed.cfg` file:
 
 ```
 #_preseed_V1
@@ -265,7 +265,7 @@ d-i finish-install/reboot_in_progress note
 
 # The tiny scripts in this tarball handle things like installing SSH keys,
 # configuring sudo, installing missing firmware, and turning on console
-# blanking & poweroff.
+# blanking/poweroff.
 d-i preseed/late_command string \
   in-target curl -so /root/preseed-late-cmd.tgz http://192.168.125.51/boot/debian/trixie-ipxe/preseed-late-cmd.tgz; \
   in-target tar -C /root -zxf /root/preseed-late-cmd.tgz; \
