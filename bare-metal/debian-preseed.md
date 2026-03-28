@@ -55,6 +55,12 @@ dhcp-host=00:e2:4c:XX:XX:XX,192.168.125.52,slide
 dhcp-host=84:69:93:XX:XX:XX,192.168.125.53,swings
 dhcp-host=00:e0:4c:XX:XX:XX,192.168.125.54,zipline
 
+# Add some DNS records.
+host-record=seesaw,192.168.125.51,300
+host-record=slide,192.168.125.52,300
+host-record=swings,192.168.125.53,300
+host-record=zipline,192.168.125.54,300
+
 # Set tag "ipxe" when option 77 == "iPXE" (as ipxe.efi does).
 dhcp-userclass=set:ipxe,iPXE
 # Default boot file
