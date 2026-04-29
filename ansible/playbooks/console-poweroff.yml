@@ -1,0 +1,22 @@
+---
+- name: Enable console display blanking and poweroff
+  hosts: all
+
+  tasks:
+    - name: Install console-poweroff systemd unit file
+      copy:
+        src: console-poweroff.service
+        dest: /etc/systemd/system/console-poweroff.service
+        owner: root
+        group: root
+        mode: 0644
+      become: yes
+      register: service_file
+
+    - name: Enable/restart console-poweroff service
+      systemd_service:
+        name: console-poweroff
+        enabled: true
+        daemon-reload: true
+        state: "{{ 'restarted' if service_file.changed else omit }}"
+      become: yes

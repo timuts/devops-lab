@@ -1,0 +1,12 @@
+- name: Install Docker
+  hosts: nodes
+  become: true
+  vars:
+    ansible_become_method: sudo
+  environment: "{{ proxy_env }}"
+
+  roles:
+    - role: geerlingguy.docker
+      vars:
+        docker_users:
+          - sysadm

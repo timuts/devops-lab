@@ -1,0 +1,6 @@
+---
+# Run all playbooks together.
+
+- import_playbook: playbooks/console-poweroff.yml
+- import_playbook: playbooks/missing-firmware.yml
+- import_playbook: playbooks/wifi.yml

@@ -1,0 +1,78 @@
+---
+- name: Configure Wifi
+  hosts: all
+
+  vars_files:
+    - vars/wifi-psk.yml
+
+  handlers:
+    # Had to be a handler since 'reset_connection' doesn't support 'when'
+    - name: Log out and log back in
+      meta: reset_connection
+      listen: relogin
+
+  tasks:
+    - name: Give read access to /etc/network/interfaces via adm group
+      user:
+        name: "{{ ansible_facts['user_id'] }}"  # We don't set ansible_user
+        groups: adm
+        append: true
+        state: present
+      become: yes
+      register: add_group
+      notify: relogin
+
+    - name: Run handlers now
+      meta: flush_handlers
+      when: add_group.changed
+
+    - name: Lock down permissions of /etc/network/interfaces
+      file:
+        path: /etc/network/interfaces
+        mode: "0640"
+        owner: "root"
+        group: "adm"
+      become: yes
+
+    - name: Find Wifi PCI device
+      shell: |
+        lspci -D \
+          | egrep -i '(network|ethernet).*(wireless|802[.]11|wi.?fi|wlan)' \
+          | head -n1 \
+          | cut -f1 -d' '
+      check_mode: false  # Run normally even in --check mode.
+      changed_when: false
+      register: pci_dev
+
+    - name: Find Wifi network interface
+      shell: "ls /sys/bus/pci/devices/{{ pci_dev.stdout }}/net | head -n1"
+      check_mode: false  # Run normally even in --check mode.
+      changed_when: false
+      register: wifi_iface
+
+    - name: Check if Wifi network interface is already configured
+      lineinfile:
+        path: /etc/network/interfaces
+        regexp: "^iface {{ wifi_iface.stdout }}"
+        line: "# N/A"
+        state: absent  # Must be absent to get 'found' in the result.
+      check_mode: true  # Never make any changes.
+      changed_when: false
+      register: iface_check
+
+    - name: Add Wifi to network interfaces
+      blockinfile:
+        path: /etc/network/interfaces
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        block: |
+          auto {{ wifi_iface.stdout }}
+          iface {{ wifi_iface.stdout }} inet dhcp
+            wpa-ssid {{ wifi_ssid }}
+            wpa-psk {{ wifi_psk }}
+        prepend_newline: true
+        append_newline: true
+        mode: "0640"
+        owner: "root"
+        group: "adm"
+      become: yes
+      when: not iface_check.found

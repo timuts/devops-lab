@@ -1,0 +1,46 @@
+---
+- name: Find missing firmware and install it.
+  hosts: all
+
+  tasks:
+    - name: Install apt-file
+      apt:
+        name:
+          - apt-file
+        state: present
+        update_cache: true
+        cache_valid_time: 14400
+      become: yes
+
+    - name: Update Contents files for apt-file
+      command:
+        cmd: "apt-file update"
+      become: yes
+      changed_when: false
+
+    - name: Look for firmware that failed to load
+      shell: |
+        dmesg \
+          | sed -En 's/.*firmware: failed to load (\S+).*/\1/p' \
+          | sort -u
+      args:
+        executable: /bin/bash
+      become: yes
+      changed_when: false
+      register: firmware_failed
+
+    - name: Search for packages that provide missing firmware
+      shell: |
+        for fw in {{ firmware_failed.stdout_lines | join(' ') }}; do
+          apt-file find "$fw" | sed -En 's@^(\S+): /\S+$@\1@p'
+        done | sort -u
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: firmware_found
+
+    - name: Install firmware packages
+      apt:
+        name: "{{ firmware_found.stdout_lines }}"
+        state: present
+      become: yes
