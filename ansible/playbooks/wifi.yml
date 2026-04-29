@@ -65,7 +65,7 @@
         path: /etc/network/interfaces
         marker: "# {mark} ANSIBLE MANAGED BLOCK"
         block: |
-          auto {{ wifi_iface.stdout }}
+          allow-hotplug {{ wifi_iface.stdout }}
           iface {{ wifi_iface.stdout }} inet dhcp
             wpa-ssid {{ wifi_ssid }}
             wpa-psk {{ wifi_psk }}
