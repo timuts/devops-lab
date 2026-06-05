@@ -37,6 +37,8 @@ Included should be:
     *   [My hardware](bare-metal/my-hardware.md)
     *   Host OS installation
         *   [Debian preseed](bare-metal/debian-preseed.md)
+    *   Configuration management
+        *   [Ansible](bare-metal/ansible.md)
     *   Kubernetes
         *   Install
         *   CNI
