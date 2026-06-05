@@ -1,0 +1,25 @@
+---
+all:
+  children:
+    nodes:
+      hosts:
+        seesaw:
+        slide:
+        swings:
+        zipline:
+      vars:
+        proxy_env:
+          HTTP_PROXY: "http://192.168.125.94:3128"
+          HTTPS_PROXY: "http://192.168.125.94:3128"
+          NO_PROXY: "localhost,127.0.0.1"
+          http_proxy: "http://192.168.125.94:3128"
+          https_proxy: "http://192.168.125.94:3128"
+          no_proxy: "localhost,127.0.0.1"
+    controlplane:
+      hosts:
+        seesaw
+    regnodes:
+      hosts:
+        slide
+        swings
+        zipline
