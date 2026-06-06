@@ -40,16 +40,94 @@ Docs:
 
 ## Configuration
 
-Docs:
-
--   https://docs.ansible.com/projects/ansible/13/
+Docs: https://docs.ansible.com/projects/ansible/13/
 
 ### Inventory
 
-```
-TODO: Paste hosts file
+A host belongs to one or more groups. Here we have groups "nodes",
+"controlplane", and "workers" in `./inventory.yml`:
+
+```yaml
+---
+all:
+  children:
+    nodes:
+      hosts:
+        seesaw:
+        slide:
+        swings:
+        zipline:
+      vars:
+        proxy_env:
+          HTTP_PROXY: "http://192.168.125.94:3128"
+          HTTPS_PROXY: "http://192.168.125.94:3128"
+          NO_PROXY: "localhost,127.0.0.1"
+          http_proxy: "http://192.168.125.94:3128"
+          https_proxy: "http://192.168.125.94:3128"
+          no_proxy: "localhost,127.0.0.1"
+    controlplane:
+      hosts:
+        seesaw:
+    workers:
+      hosts:
+        slide:
+        swings:
+        zipline:
 ```
 
+### Playbooks
+
+A list of tasks to be executed in order. An example:
+
+```yaml
+---
+- name: Enable console display blanking and poweroff
+  hosts: all
+
+  tasks:
+    - name: Install console-poweroff systemd unit file
+      copy:
+        src: console-poweroff.service
+        dest: /etc/systemd/system/console-poweroff.service
+        owner: root
+        group: root
+        mode: 0644
+      become: yes
+      register: service_file
+
+    - name: Enable/restart console-poweroff service
+      systemd_service:
+        name: console-poweroff
+        enabled: true
+        daemon-reload: true
+        state: "{{ 'restarted' if service_file.changed else omit }}"
+      become: yes
+```
+
+A playbook and its templates and files can be grouped together in a "role".
+These roles can be shared on [galaxy.ansible.com](https://galaxy.ansible.com/).
+You can download them into `~/.ansible/roles` like so:
+
+```bash
+$ ansible-galaxy role install geerlingguy.docker
+```
+
+To use the role:
+
+```yaml
+- name: Install Docker
+  hosts: nodes
+  become: true
+  vars:
+    ansible_become_method: sudo
+  environment: "{{ proxy_env }}"
+
+  roles:
+    - role: geerlingguy.docker
+      vars:
+        docker_users:
+          - sysadm
+```
 
 ## Problems
 
@@ -57,7 +135,7 @@ TODO: Paste hosts file
 
 Ansible's repository signatures are considered insecure because they use SHA1.
 
-```
+```bash
 $ sudo apt update
 [...snip...]
 Warning: OpenPGP signature verification failed: ... because: SHA1 is not considered secure since ...
@@ -66,7 +144,7 @@ Error: The repository ... is not signed.
 
 Luckily there is a way to temporarily allow SHA1 again:
 
-```
+```bash
 sudo mkdir -p /etc/crypto-policies/back-ends
 
 sudo cp /usr/share/apt/default-sequoia.config /etc/crypto-policies/back-ends/apt-sequoia.config
@@ -84,7 +162,7 @@ suggested putting `allow-insecure=yes` or `trusted=yes` beside or replacing
 `signed-by` in `/etc/apt/sources.list.d/ansible.list`. This effectively
 disables signature verification altogether.
 
-Links:
+See also:
 
 -   https://github.com/ansible-community/ppa/issues/114
 -   https://wiki.debian.org/Teams/Apt/Sha1Removal
