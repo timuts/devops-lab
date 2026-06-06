@@ -64,11 +64,12 @@
       blockinfile:
         path: /etc/network/interfaces
         marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        # Commented out since we're not using wifi at the moment.
         block: |
-          allow-hotplug {{ wifi_iface.stdout }}
-          iface {{ wifi_iface.stdout }} inet dhcp
-            wpa-ssid {{ wifi_ssid }}
-            wpa-psk {{ wifi_psk }}
+          #allow-hotplug {{ wifi_iface.stdout }}
+          #iface {{ wifi_iface.stdout }} inet dhcp
+          #  wpa-ssid {{ wifi_ssid }}
+          #  wpa-psk {{ wifi_psk }}
         prepend_newline: true
         append_newline: true
         mode: "0640"
