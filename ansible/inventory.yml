@@ -17,9 +17,9 @@ all:
           no_proxy: "localhost,127.0.0.1"
     controlplane:
       hosts:
-        seesaw
+        seesaw:
     regnodes:
       hosts:
-        slide
-        swings
-        zipline
+        slide:
+        swings:
+        zipline:
