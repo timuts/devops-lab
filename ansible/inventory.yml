@@ -18,7 +18,7 @@ all:
     controlplane:
       hosts:
         seesaw:
-    regnodes:
+    workers:
       hosts:
         slide:
         swings:
