@@ -5,3 +5,8 @@
 
 /tmp/
 
+/bare-metal/os-install/debian/trixie/ipxe/tftp/ipxe.efi
+/bare-metal/os-install/debian/trixie/ipxe/tftp/ipxe.pxe
+/bare-metal/os-install/debian/trixie/ipxe/www/initrd.gz
+/bare-metal/os-install/debian/trixie/ipxe/www/linux
+/bare-metal/os-install/debian/trixie/ipxe/www/preseed-late-cmd.tgz

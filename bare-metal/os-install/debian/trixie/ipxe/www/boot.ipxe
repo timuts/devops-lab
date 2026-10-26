@@ -1,0 +1,8 @@
+#!ipxe
+
+set dir http://192.168.125.94/boot/debian/trixie-ipxe
+
+kernel ${dir}/linux
+initrd ${dir}/initrd.gz
+
+boot linux initrd=initrd.gz auto=true priority=critical language=en country=US locale=en_US.UTF-8 keymap=us interface=auto netcfg/no_default_route=true netcfg/get_nameservers=192.168.125.94 mirror/http/proxy=http://192.168.125.94:3128 DEBCONF_DEBUG=5 preseed/url=${dir}/preseed.cfg
