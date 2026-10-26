@@ -57,6 +57,7 @@
           - '-En'
           - 's/^u:([^:]+).*/root:\\1/p'
           - /etc/shadow
+      changed_when: false
       register: pw
 
     - name: Check current root passwd
@@ -66,6 +67,7 @@
           - '-En'
           - 's/^(root:[^:]+).*/\1/p'
           - '{{ rootfs }}/etc/shadow'
+      changed_when: false
       register: curpw
 
     - name: Set root passwd
@@ -207,6 +209,7 @@
       until: 'wait_result.rc == 0'
       retries: 10
       delay: 2
+      changed_when: false
 
     - name: Get container PID
       command:
@@ -214,6 +217,7 @@
           - machinectl
           - show
           - '{{ inventory_hostname }}'
+      changed_when: false
       register: getpid
 
     - name: Set container PID variable
