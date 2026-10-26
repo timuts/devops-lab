@@ -15,6 +15,14 @@ all:
         slide:
         swings:
         zipline:
+    containers:
+      hosts:
+        lab-rtr:
+          ip4_addr: 192.168.125.11
+          ip4_prefixlen: 24
+        testcont:
+          ip4_addr: 192.168.125.12
+          ip4_prefixlen: 24
   vars:
     proxy_env:
       HTTP_PROXY: "http://192.168.125.94:3128"

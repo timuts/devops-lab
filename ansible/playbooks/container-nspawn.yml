@@ -1,0 +1,231 @@
+---
+- name: Create a systemd-nspawn container
+  hosts: all
+  connection: local
+  become: true
+  become_method: sudo
+  become_user: root
+  gather_facts: false
+  vars:
+    rootfs: '/var/lib/machines/{{ inventory_hostname }}'
+
+  tasks:
+    - name: Install bootstrap packages
+      apt:
+        name:
+          - debootstrap
+        state: present
+        update_cache: true
+        cache_valid_time: 14400
+
+    - name: Check if already bootstrapped
+      stat:
+        path: '{{ rootfs }}/etc'
+      register: rootfs_dir
+
+    - name: Bootstrap
+      command:
+        argv:
+          - debootstrap
+          - '--arch=amd64'
+          - trixie
+          - '{{ rootfs }}'
+          - http://deb.debian.org/debian
+      when: not rootfs_dir.stat.exists
+
+    - name: Add config in /etc/systemd/nspawn
+      copy:
+        content: |
+          [Exec]
+          Boot=yes
+          Hostname={{ inventory_hostname }}
+          PrivateUsers=yes
+          PrivateUsersOwnership=off
+          LinkJournal=guest
+
+          [Network]
+          Bridge=br0
+        dest: '/etc/systemd/nspawn/{{ inventory_hostname }}.nspawn'
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Get encrypted root passwd
+      command:
+        argv:
+          - sed
+          - '-En'
+          - 's/^u:([^:]+).*/root:\\1/p'
+          - /etc/shadow
+      register: pw
+
+    - name: Check current root passwd
+      command:
+        argv:
+          - sed
+          - '-En'
+          - 's/^(root:[^:]+).*/\1/p'
+          - '{{ rootfs }}/etc/shadow'
+      register: curpw
+
+    - name: Set root passwd
+      command:
+        argv:
+          - chpasswd
+          - '--root'
+          - '{{ rootfs }}'
+          - '-e'
+        stdin: '{{ pw.stdout }}'
+      when: curpw.stdout != pw.stdout
+
+    - name: Set hostname
+      copy:
+        content: "{{ inventory_hostname }}\n"
+        dest: '{{ rootfs }}/etc/hostname'
+        mode: '0644'
+
+    - name: Add hostname to /etc/hosts
+      lineinfile:
+        path: '{{ rootfs }}/etc/hosts'
+        line: '127.0.1.1  {{ inventory_hostname }}'
+        insertafter: EOF
+        # To gracefully handle check_mode in the case that debootstrap hasn't
+        # been run yet.
+        create: yes
+
+    - name: Configure host0 interface
+      copy:
+        content: |
+          auto host0
+          iface host0 inet static
+              address {{ ip4_addr }}/{{ ip4_prefixlen }}
+              #gateway 192.168.125.94
+        dest: '{{ rootfs }}/etc/network/interfaces.d/host0'
+        mode: '0644'
+        force: false  # no change if exists
+      debugger: on_failed
+
+    - name: Check /etc/resolv.conf
+      stat:
+        path: '{{ rootfs }}/etc/resolv.conf'
+      register: resolv
+
+    - name: Rename /etc/resolv.conf
+      command:
+        argv:
+          - mv
+          - '{{ rootfs }}/etc/resolv.conf'
+          - '{{ rootfs }}/etc/resolv.conf.bak-{{ ansible_facts.date_time.epoch }}'
+      when: resolv.stat.islnk is defined and resolv.stat.islnk
+
+    - name: Configure DNS resolution
+      copy:
+        content: |
+          search .
+          nameserver 192.168.125.94
+        dest: '{{ rootfs }}/etc/resolv.conf'
+        mode: '0644'
+
+    - name: Configure proxy
+      copy:
+        content: >-
+          Acquire::http::Proxy "http://192.168.125.94:3128";
+        dest: '{{ rootfs }}/etc/apt/apt.conf.d/80proxy'
+        mode: '0644'
+
+    - name: Create directory /root/.ssh
+      file:
+        path: '{{ rootfs }}/root/.ssh'
+        state: directory
+        mode: '0700'
+
+    - name: Set root authorized_keys
+      copy:
+        src: ssh/authorized_keys
+        dest: '{{ rootfs }}/root/.ssh/authorized_keys'
+        mode: '0600'
+
+    - name: Check status of UID/GID remap
+      command:
+        argv:
+          - "{{ playbook_dir }}/files/remap-check.sh"
+          - "{{ rootfs }}"
+      failed_when: false
+      changed_when: false
+      register: remap_check
+
+    - name: Remap UIDs/GIDs while the container is not running
+      when: "remap_check.rc != 0"
+      block:
+        - name: Check if container is running (1)
+          command:
+            argv:
+              - machinectl
+              - status
+              - '{{ inventory_hostname }}'
+          failed_when: false
+          changed_when: false
+          register: status
+
+        - name: Stop the container if running
+          command:
+            argv:
+              - machinectl
+              - stop
+              - '{{ inventory_hostname }}'
+          when: "status.rc == 0 or 'Since:' in status.stdout"
+          register: stop
+
+        - name: Remap UID/GIDs
+          command:
+            argv:
+              - "{{ playbook_dir }}/files/remap-ids.sh"
+              - "{{ rootfs }}"
+
+    - name: Check if container is running (2)
+      command:
+        argv:
+          - machinectl
+          - status
+          - '{{ inventory_hostname }}'
+      failed_when: false
+      changed_when: false
+      when: stop is succeeded
+      register: status
+
+    - name: Boot the container
+      command:
+        argv:
+          - machinectl
+          - start
+          - '{{ inventory_hostname }}'
+      when: "status.rc != 0 or 'Since:' not in status.stdout"
+
+    - name: Wait for container to boot
+      command: 'systemd-run --machine={{ inventory_hostname }} --quiet --pipe systemctl is-system-running --wait'
+      register: wait_result
+      until: 'wait_result.rc == 0'
+      retries: 10
+      delay: 2
+
+    - name: Get container PID
+      command:
+        argv:
+          - machinectl
+          - show
+          - '{{ inventory_hostname }}'
+      register: getpid
+
+    - name: Set container PID variable
+      set_fact:
+        pid: '{{ getpid.stdout | regex_search("Leader=([0-9]+)", "\1") | first }}'
+
+    - name: Install packages required by Ansible
+      command:
+        argv:
+          - nsenter
+          - '-at'
+          - '{{ pid }}'
+          - /bin/bash
+          - '-c'
+          - 'apt install -y dbus openssh-server python3'

@@ -6,11 +6,16 @@
 #
 
 set -eu
+set -o pipefail
+set -o errtrace
 
 MIN_ID=2000544
 MAX_ID=8554044
+MIN_MAP_ID=100000
+FORCE=no
+REMAP_CHECK="$(dirname "$BASH_SOURCE")/remap-check.sh"
 
-function sanity_checks() {
+function check_root_dir() {
   local croot="$1"
 
   if [[ "$(readlink -f "$croot")" == / ]]; then
@@ -38,7 +43,9 @@ function sanity_checks() {
 function reserve_id_range() {
   local chost="$1"
 
-  local id_base=$(awk -F: -v host '$1 == host {print $2}')
+  local id_base=$(
+    awk -F: -v chost="$chost" '$1 == chost {print $2; exit}' \
+      /etc/subuid /etc/subgid)
 
   if [[ -z "$id_base" ]]; then
     local top_id=$( 
@@ -57,8 +64,9 @@ function reserve_id_range() {
       exit 1
     fi
 
-    echo "DEBUG:" echo "$host:$id_base:65536" \>\> /etc/subuid
-    echo "DEBUG:" echo "$host:$id_base:65536" \>\> /etc/subgid
+    echo "New id_base='$id_base'" >&2
+    echo "$chost:$id_base:65536" >> /etc/subuid
+    echo "$chost:$id_base:65536" >> /etc/subgid
   fi
   
   if [[ "$id_base" -lt 100000 ]]; then
@@ -76,13 +84,27 @@ function reserve_id_range() {
   echo "$id_base"
 }
 
+function assert_not_done() {
+  local croot="$1"
+  local id_base="$2"
+
+  rootdir_uid=$(stat -c '%u' "$croot/.")
+  rootdir_gid=$(stat -c '%g' "$croot/.")
+  if [[ "$rootdir_uid" -eq "$id_base" ]] && \
+     [[ "$rootdir_gid" -eq "$id_base" ]]; then
+    echo "Already done (root dir UID/GID matches)."
+    exit 0
+  fi
+}
+
 function backup_ids() {
   local croot="$1"
   local tmpd="$2"
 
-  cd "$croot"
-  echo "DEBUG:" getfacl -R . \> "$tmpd/backup.getfacl"
-  echo "Backup: $tmpd/backup.getfacl"
+  pushd "$croot" > /dev/null
+  getfacl -R . > "$tmpd/backup.getfacl"
+  echo "Backup: $tmpd/backup.getfacl" >&2
+  popd > /dev/null
 }
 
 function remap_ids() {
@@ -90,41 +112,82 @@ function remap_ids() {
   local croot="$2"
   local tmpd="$3"
 
-  cd "$tmpd"
+  pushd "$tmpd" > /dev/null
   find "$croot" -xdev -printf "%U\n" | sort -nu > all-uids
   find "$croot" -xdev -printf "%G\n" | sort -nu > all-gids
 
   for uid in $(cat all-uids); do
+    if [[ "$uid" -ge "$MIN_MAP_ID" ]]; then
+      continue
+    fi
+
     new_uid=$(( id_base + uid ))
-    echo find "$croot" -xdev -uid "$uid" -exec chown "$new_uid" {} +
+    find "$croot" -xdev -uid "$uid" -exec chown -h "$new_uid" {} +
   done
 
   for gid in $(cat all-gids); do
+    if [[ "$gid" -ge "$MIN_MAP_ID" ]]; then
+      continue
+    fi
+
     new_gid=$(( id_base + gid ))
-    echo find "$croot" -xdev -gid "$gid" -exec chgrp "$new_gid" {} +
+    find "$croot" -xdev -gid "$gid" -exec chgrp -h "$new_gid" {} +
   done
+
+  popd > /dev/null
 }
 
 function main() {
+  trap 'print_stack' ERR
+
   if [[ $# -ne 1 ]] || ! [[ -d "$1" ]]; then
     echo "Usage: $0 <container_root_directory>" >&2
     exit 1
   fi
 
-  local croot=$1
+  if ! [[ -d "$1" ]]; then
+    fatal "Not a directory: $1"
+  fi
+
+  local croot=$(readlink -f "$1")
   local chost=$(basename "$croot")
 
-  sanity_checks "$croot"
+  check_root_dir "$croot"
+
+  local tmpd="$(mktemp -d "/tmp/remap-ids.XXXXXXXXXX")"
+
+  if "$REMAP_CHECK" "$croot" &> "$tmpd/remap-check.out"; then
+    echo "OK. Nothing to do. Remapping was already done."
+    exit 0
+  fi
 
   local id_base=$(reserve_id_range "$chost")
 
-  local tmpd="$(mktemp -d "/tmp/remap-ids.XXXXXXXXXX")"
+  #assert_not_done "$croot" "$id_base"
 
   backup_ids "$croot" "$tmpd"
 
   remap_ids "$id_base" "$croot" "$tmpd"
 
-  echo SUCCESS
+  echo "OK"
+}
+
+function print_stack() {
+    # Default of 1 means skip the first frame to ignore this function.
+    local skip="${1:-1}"
+
+    # Minus one to ignore the call to main() at the end of this file.
+    local i
+    for ((i = $skip; i < ${#FUNCNAME[@]} - 1; i++)); do
+        echo "  at ${FUNCNAME[$i]}() in ${BASH_SOURCE[$i]}:${BASH_LINENO[$i-1]}"
+    done
+}
+
+function fatal() {
+  local msg="$1"
+  echo "FATAL: $msg" >&2
+  print_stack 2
+  exit 1
 }
 
 main "$@"

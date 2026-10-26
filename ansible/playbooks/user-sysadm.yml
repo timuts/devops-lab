@@ -1,0 +1,47 @@
+---
+- name: Create User Account - sysadm
+  hosts: all
+  vars:
+    ansible_user: root
+
+  tasks:
+    - name: New group - sysadm
+      group:
+        name: sysadm
+        state: present
+
+    - name: New user - sysadm
+      user:
+        name: sysadm
+        comment: User
+        group: sysadm
+        groups: sysadm, sudo
+        append: true
+        shell: /bin/bash
+        state: present
+
+    - name: Create .ssh directory - sysadm
+      file:
+        path: /home/sysadm/.ssh
+        state: directory
+        owner: sysadm
+        group: sysadm
+        mode: "0700"
+
+    - name: Copy SSH authorized keys - sysadm
+      copy:
+        src: ssh/authorized_keys
+        dest: /home/sysadm/.ssh/authorized_keys
+        force: false  # no change if exists
+        owner: sysadm
+        group: sysadm
+        mode: "0600"
+        directory_mode: "0700"
+
+    - name: Install dot-files - sysadm
+      unarchive:
+        src: dotfiles/dotfiles.tar
+        creates: /home/sysadm/.config/pushed-dotfiles
+        dest: /home/sysadm
+        owner: sysadm
+        group: sysadm
