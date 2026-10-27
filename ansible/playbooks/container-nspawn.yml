@@ -137,7 +137,7 @@
 
     - name: Configure proxy
       copy:
-        content: >-
+        content: |
           Acquire::http::Proxy "http://192.168.125.94:3128";
         dest: '{{ rootfs }}/etc/apt/apt.conf.d/80proxy'
         mode: '0644'
