@@ -8,6 +8,11 @@
   gather_facts: false
   vars:
     rootfs: '/var/lib/machines/{{ inventory_hostname }}'
+    USER: '{{ lookup("env", "USER") }}'
+    nsenter_args: ['nsenter', '-at', '{{ pid }}']
+    dpkg_query_args: ['/usr/bin/dpkg-query', '--showformat=${db:Status-Status}\n', '--show']
+    apt_install_args: ['/usr/bin/apt', 'install', '-y']
+    required_pkgs: ['dbus', 'openssh-server', 'python3', 'bc']
 
   tasks:
     - name: Install bootstrap packages
@@ -50,34 +55,36 @@
         group: root
         mode: '0644'
 
-    - name: Get encrypted root passwd
+    - name: Get current user's password hash
       command:
         argv:
           - sed
           - '-En'
-          - 's/^u:([^:]+).*/root:\\1/p'
+          - 's/^{{ USER }}:([^:]+).*/\1/p'
           - /etc/shadow
       changed_when: false
       register: pw
+      failed_when: pw.rc != 0 or not pw.stdout
 
-    - name: Check current root passwd
+    - name: Check root password hash
       command:
         argv:
           - sed
           - '-En'
-          - 's/^(root:[^:]+).*/\1/p'
+          - 's/^root:([^:]+).*/\1/p'
           - '{{ rootfs }}/etc/shadow'
       changed_when: false
       register: curpw
+      failed_when: curpw.rc != 0 or not curpw.stdout
 
-    - name: Set root passwd
+    - name: Set root password hash
       command:
         argv:
           - chpasswd
           - '--root'
           - '{{ rootfs }}'
           - '-e'
-        stdin: '{{ pw.stdout }}'
+        stdin: 'root:{{ pw.stdout }}'
       when: curpw.stdout != pw.stdout
 
     - name: Set hostname
@@ -218,18 +225,43 @@
           - show
           - '{{ inventory_hostname }}'
       changed_when: false
+      check_mode: false
       register: getpid
+
+    - name: Get container PID (dummy for check mode)
+      set_fact:
+        getpid:
+          stdout: "... Leader=12345 ..."
+      when: ansible_check_mode | default(false)
 
     - name: Set container PID variable
       set_fact:
         pid: '{{ getpid.stdout | regex_search("Leader=([0-9]+)", "\1") | first }}'
 
+    - name: Check if packages required by Ansible are installed
+      command:
+        argv: '{{ nsenter_args + dpkg_query_args + required_pkgs }}'
+      failed_when: false
+      changed_when: false
+      register: dpkg_query
+
+    - name: Check if packages required by Ansible are installed (dummy for check mode)
+      set_fact:
+        dpkg_query:
+          stdout_lines:
+            - installed
+            - config-files
+            - installed
+      when: ansible_check_mode | default(false)
+
+    - name: Set variable for result of checking if packages required by Ansible are installed
+      set_fact:
+        all_installed: '{{ num_installed == num_packages }}'
+      vars:
+        num_installed: '{{ dpkg_query.stdout_lines | select("equalto", "installed") | list | length }}'
+        num_packages: '{{ required_pkgs | list | length }}'
+
     - name: Install packages required by Ansible
       command:
-        argv:
-          - nsenter
-          - '-at'
-          - '{{ pid }}'
-          - /bin/bash
-          - '-c'
-          - 'apt install -y dbus openssh-server python3'
+        argv: '{{ nsenter_args + apt_install_args + required_pkgs }}'
+      when: not all_installed
