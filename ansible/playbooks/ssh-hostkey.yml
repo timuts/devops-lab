@@ -1,0 +1,36 @@
+---
+- name: Update SSH host key in known_hosts
+  hosts: all
+  vars:
+    ansible_user: root
+    ansible_ssh_extra_args: "-o StrictHostKeyChecking=no"
+
+  tasks:
+    - name: Get host key
+      slurp:
+        src: /etc/ssh/ssh_host_ed25519_key.pub
+      register: host_key
+
+    - name: Remove from known_hosts (locally)
+      command: "ssh-keygen -f ~/.ssh/known_hosts -R {{ inventory_hostname }}"
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Add to known_hosts (locally)
+      lineinfile:
+        path: ~/.ssh/known_hosts
+        line: >-
+          {{ inventory_hostname }} {{ host_key.content | b64decode | trim }}
+        create: yes
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Rehash known_hosts entries
+      command: "ssh-keygen -H -f ~/.ssh/known_hosts"
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Verify SSH connection works
+      ping:
+      vars:
+        ansible_ssh_extra_args: ""

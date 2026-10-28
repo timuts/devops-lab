@@ -2,4 +2,5 @@
 # Playbooks for systemd-nspawn containers
 
 - import_playbook: playbooks/container-nspawn.yml
+- import_playbook: playbooks/ssh-hostkey.yml
 - import_playbook: playbooks/user-sysadm.yml
