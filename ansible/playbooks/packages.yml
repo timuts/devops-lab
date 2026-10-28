@@ -1,0 +1,26 @@
+---
+- name: Install some packages
+  hosts: all
+
+  tasks:
+    - name: Install basic packages
+      apt:
+        name:
+          - bind9-dnsutils
+          - bind9-host
+          - curl
+          - iputils-ping
+          - iputils-tracepath
+          - man-db
+          - net-tools
+          - netcat-openbsd
+          - openssh-server
+          - rsync
+          - screen
+          - sudo
+          - traceroute
+          - vim
+          - wget
+        update_cache: true
+        cache_valid_time: 14400
+      become: yes

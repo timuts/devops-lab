@@ -3,4 +3,7 @@
 
 - import_playbook: playbooks/container-nspawn.yml
 - import_playbook: playbooks/ssh-hostkey.yml
+- import_playbook: playbooks/sudo.yml
+- import_playbook: playbooks/sshd-env.yml
 - import_playbook: playbooks/user-sysadm.yml
+- import_playbook: playbooks/packages.yml

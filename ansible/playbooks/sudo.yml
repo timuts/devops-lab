@@ -1,0 +1,15 @@
+---
+- name: Configure sudo
+  hosts: all
+  vars:
+    ansible_user: root
+
+  tasks:
+    - name: Sudo shouldn't require a password
+      lineinfile:
+        path: /etc/sudoers
+        regexp: '^%sudo\s+ALL\s*=\s*[(]ALL\s*:\s*ALL[)].*ALL\s*$'
+        line: "%sudo	ALL=(ALL:ALL) NOPASSWD: ALL"
+        mode: "0440"
+        owner: root
+        group: root

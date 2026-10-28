@@ -1,0 +1,22 @@
+---
+- name: Configure AcceptEnv in sshd_config
+  hosts: all
+
+  tasks:
+    - name: Set AcceptEnv for sshd
+      # Stop accepting LANG, LC_* from clients to prevent this:
+      #   bash: warning: setlocale: LC_CTYPE: cannot change locale (en_US.UTF-8): No such file or directory
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        line: 'AcceptEnv COLORTERM NO_COLOR'
+        regexp: '^AcceptEnv\s'
+      register: cfg_change
+      when: not ansible_check_mode | default(true)
+      become: yes
+
+    - name: Restart sshd
+      service:
+        name: ssh
+        state: restarted
+      when: not ansible_check_mode and cfg_change.changed
+      become: yes
