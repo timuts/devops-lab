@@ -12,7 +12,7 @@
     nsenter_args: ['nsenter', '-at', '{{ pid }}']
     dpkg_query_args: ['/usr/bin/dpkg-query', '--showformat=${db:Status-Status}\n', '--show']
     apt_install_args: ['/usr/bin/apt', 'install', '-y']
-    required_pkgs: ['dbus', 'openssh-server', 'python3', 'bc']
+    required_pkgs: ['dbus', 'openssh-server', 'python3']
 
   tasks:
     - name: Install bootstrap packages
@@ -33,6 +33,7 @@
         argv:
           - debootstrap
           - '--arch=amd64'
+          - '--include={{ required_pkgs | join(",") }}'
           - trixie
           - '{{ rootfs }}'
           - http://deb.debian.org/debian
