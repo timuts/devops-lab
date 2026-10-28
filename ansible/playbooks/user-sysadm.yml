@@ -45,3 +45,4 @@
         dest: /home/sysadm
         owner: sysadm
         group: sysadm
+      when: not ansible_check_mode
