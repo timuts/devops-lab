@@ -33,11 +33,11 @@ function check_root_dir() {
     exit 1
   fi
 
-  #nspawn_cfg="/etc/systemd/nspawn/${chost}.nspawn"
-  #if ! [[ -f "$nspawn_cfg" ]]; then
-  #  echo "ERROR: Missing $nspawn_cfg" >&2
-  #  exit 1
-  #fi
+  nspawn_cfg="/etc/systemd/nspawn/${chost}.nspawn"
+  if ! [[ -f "$nspawn_cfg" ]]; then
+    echo "ERROR: Missing $nspawn_cfg" >&2
+    exit 1
+  fi
 }
 
 function reserve_id_range() {
