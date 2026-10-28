@@ -226,7 +226,6 @@
           - show
           - '{{ inventory_hostname }}'
       changed_when: false
-      check_mode: false
       register: getpid
 
     - name: Get container PID (dummy for check mode)
